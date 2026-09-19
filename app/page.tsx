@@ -16,6 +16,7 @@ import {
   Server,
   MessageSquare,
 } from 'lucide-react';
+import WalletConnect from '@/components/WalletConnect';
 
 export default function Home() {
   return (
@@ -35,12 +36,9 @@ export default function Home() {
             <a href="#pricing" className="hover:text-white transition">Pricing</a>
             <a href="#architecture" className="hover:text-white transition">Arquitectura</a>
           </div>
-          <a
-            href="#contact"
-            className="px-5 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium transition"
-          >
-            Solicitar demo
-          </a>
+          <div className="flex items-center gap-3">
+            <WalletConnect />
+          </div>
         </div>
       </nav>
 
@@ -49,7 +47,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm mb-8">
             <Zap className="w-4 h-4" />
-            Software operacional · No custodiamos fondos
+            Software operacional · No custodiamos fondos · Stellar ready
           </div>
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
             El sistema operativo<br />
@@ -77,6 +75,21 @@ export default function Home() {
             >
               Ver módulos
             </a>
+          </div>
+
+          {/* Network badge */}
+          <div className="mt-10 flex items-center justify-center gap-3 text-sm text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              Testnet
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Mainnet
+            </span>
+            <span className="text-slate-700">|</span>
+            <span>Conectá tu wallet Stellar</span>
           </div>
         </div>
       </section>

@@ -6,6 +6,13 @@ GamingOS is a pure SaaS platform that helps iGaming operators manage risk, treas
 
 We **never** custody player funds. The money always stays with the operator.
 
+## Features
+
+- Connect Stellar wallet (Freighter)
+- Switch between **Testnet** and **Mainnet**
+- Persistent session (localStorage)
+- View address on Stellar Expert
+
 ## Positioning
 
 > GamingOS is an operational software company for iGaming, powered by AI.  
@@ -24,23 +31,24 @@ We **never** custody player funds. The money always stays with the operator.
 - API Platform
 - Stellar Settlement Layer (infrastructure)
 
-## Pricing (indicative)
+## Wallet Connection
 
-| Plan       | Price          |
-|------------|----------------|
-| Starter    | $499 / month   |
-| Pro        | $1,999 / month |
-| Enterprise | $5,000 – $20,000 / month |
+Uses **Freighter** (`@stellar/freighter-api`).
 
-+ Setup: $5,000 – $50,000  
-+ Premium modules: from $999 / month
+1. Install [Freighter](https://www.freighter.app/)
+2. Create or import a Stellar account
+3. Switch Freighter to Testnet or Mainnet
+4. Click **Conectar Wallet** on the site
 
-## Tech Stack (this site)
+The selected network is stored and shown in the UI. Make sure Freighter is on the same network.
 
-- Next.js 14
+## Tech Stack
+
+- Next.js 14 (App Router)
 - Tailwind CSS
 - TypeScript
-- Deployed on Vercel
+- `@stellar/freighter-api`
+- `@stellar/stellar-sdk`
 
 ## Local development
 
