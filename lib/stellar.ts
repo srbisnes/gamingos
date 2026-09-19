@@ -15,7 +15,7 @@ export const NETWORKS = {
     horizon: 'https://horizon.stellar.org',
     soroban: 'https://mainnet.sorobanrpc.com',
     explorer: 'https://stellar.expert/explorer/public',
-    friendbot: null,
+    friendbot: null as string | null,
   },
 } as const;
 
@@ -37,4 +37,6 @@ export const STORAGE_KEYS = {
   ADDRESS: 'gamingos_wallet_address',
   NETWORK: 'gamingos_network',
   CONNECTED: 'gamingos_connected',
+  MODE: 'gamingos_wallet_mode', // 'freighter' | 'managed'
+  SECRET_HINT: 'gamingos_has_managed_wallet',
 } as const;

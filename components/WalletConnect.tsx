@@ -7,7 +7,6 @@ import {
   getAddress,
   getNetworkDetails,
 } from '@stellar/freighter-api';
-import { Horizon } from '@stellar/stellar-sdk';
 import {
   Wallet,
   ChevronDown,
@@ -17,6 +16,8 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   NETWORKS,
@@ -26,30 +27,37 @@ import {
   STORAGE_KEYS,
 } from '@/lib/stellar';
 
+type WalletMode = 'freighter' | 'managed';
+
 export default function WalletConnect() {
   const [address, setAddress] = useState<string | null>(null);
   const [network, setNetwork] = useState<Network>('TESTNET');
+  const [mode, setMode] = useState<WalletMode>('managed');
   const [balance, setBalance] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successSteps, setSuccessSteps] = useState<string[]>([]);
 
-  // Restore session on mount
+  // Restore session
   useEffect(() => {
     const savedAddress = localStorage.getItem(STORAGE_KEYS.ADDRESS);
     const savedNetwork = localStorage.getItem(STORAGE_KEYS.NETWORK) as Network | null;
     const wasConnected = localStorage.getItem(STORAGE_KEYS.CONNECTED) === 'true';
+    const savedMode = localStorage.getItem(STORAGE_KEYS.MODE) as WalletMode | null;
 
     if (savedNetwork) setNetwork(savedNetwork);
+    if (savedMode) setMode(savedMode);
 
     if (wasConnected && savedAddress) {
-      checkConnection(savedAddress);
+      setAddress(savedAddress);
     }
   }, []);
 
-  // Fetch balance whenever address or network changes
+  // Fetch balance
   useEffect(() => {
     if (address) {
       fetchBalance(address, network);
@@ -61,53 +69,92 @@ export default function WalletConnect() {
   const fetchBalance = async (addr: string, net: Network) => {
     setIsBalanceLoading(true);
     try {
-      const server = new Horizon.Server(NETWORKS[net].horizon);
-      const account = await server.loadAccount(addr);
-      const xlm = account.balances.find(
-        (b) => b.asset_type === 'native'
-      ) as Horizon.Horizon.BalanceLineNative | undefined;
-
-      setBalance(xlm?.balance ?? '0');
-    } catch (err: any) {
-      // Account may not exist yet (especially on testnet)
-      if (err?.response?.status === 404) {
-        setBalance('0');
+      const netParam = net === 'PUBLIC' ? 'public' : 'testnet';
+      const res = await fetch(
+        `/api/wallet/balance?publicKey=${encodeURIComponent(addr)}&network=${netParam}`
+      );
+      const data = await res.json();
+      if (data.success) {
+        setBalance(data.balance ?? '0');
       } else {
-        console.error('Error fetching balance:', err);
         setBalance(null);
       }
+    } catch {
+      setBalance(null);
     } finally {
       setIsBalanceLoading(false);
     }
   };
 
-  const checkConnection = async (fallbackAddress?: string) => {
-    try {
-      const connected = await isConnected();
-      if (connected) {
-        const { address: addr } = await getAddress();
-        if (addr) {
-          setAddress(addr);
-          localStorage.setItem(STORAGE_KEYS.ADDRESS, addr);
-          localStorage.setItem(STORAGE_KEYS.CONNECTED, 'true');
-          return;
-        }
-      }
-      if (fallbackAddress) {
-        setAddress(fallbackAddress);
-      }
-    } catch {
-      // Freighter not available
-    }
-  };
+  /** Create / restore managed Testnet wallet via API */
+  const connectManaged = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setShowSuccess(false);
+    setSuccessSteps([]);
 
-  const connect = useCallback(async () => {
+    try {
+      const existing = localStorage.getItem(STORAGE_KEYS.ADDRESS);
+      const res = await fetch('/api/wallet/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicKey: existing || undefined }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'No se pudo crear la wallet');
+      }
+
+      const steps: string[] = [];
+      if (!data.existing) {
+        steps.push('✅ Wallet Stellar creada');
+      } else {
+        steps.push('✅ Wallet Stellar recuperada');
+      }
+      if (data.funded) {
+        steps.push('✅ Cuenta fondeada en Testnet');
+      } else {
+        steps.push('⚠️ Fondeo pendiente (reintentá Airdrop)');
+      }
+      steps.push('✅ Lista para operar');
+      setSuccessSteps(steps);
+      setShowSuccess(true);
+
+      // Persist session
+      setAddress(data.publicKey);
+      setNetwork('TESTNET');
+      setMode('managed');
+      localStorage.setItem(STORAGE_KEYS.ADDRESS, data.publicKey);
+      localStorage.setItem(STORAGE_KEYS.NETWORK, 'TESTNET');
+      localStorage.setItem(STORAGE_KEYS.CONNECTED, 'true');
+      localStorage.setItem(STORAGE_KEYS.MODE, 'managed');
+      localStorage.setItem(STORAGE_KEYS.SECRET_HINT, 'true');
+
+      // If secret was returned (first time), keep a local backup flag only
+      // (we intentionally do NOT store the raw secret in localStorage long-term)
+      if (data.secretKey) {
+        // One-time: user can copy from success UI if we show it — for security we don't persist it
+        sessionStorage.setItem('gamingos_temp_secret', data.secretKey);
+      }
+
+      setTimeout(() => setShowSuccess(false), 5000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Error al crear wallet Testnet');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /** Connect external Freighter wallet */
+  const connectFreighter = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await requestAccess();
       if (result.error) {
-        setError(result.error || 'No se pudo conectar la wallet');
+        setError(result.error || 'No se pudo conectar Freighter');
         return;
       }
       const addr = result.address;
@@ -116,7 +163,6 @@ export default function WalletConnect() {
         return;
       }
 
-      // Detect network from Freighter
       try {
         const details = await getNetworkDetails();
         if (details?.networkPassphrase) {
@@ -131,28 +177,53 @@ export default function WalletConnect() {
       }
 
       setAddress(addr);
+      setMode('freighter');
       localStorage.setItem(STORAGE_KEYS.ADDRESS, addr);
       localStorage.setItem(STORAGE_KEYS.CONNECTED, 'true');
-      localStorage.setItem(STORAGE_KEYS.NETWORK, network);
+      localStorage.setItem(STORAGE_KEYS.MODE, 'freighter');
     } catch (err: any) {
-      console.error(err);
       setError(
-        err?.message?.toLowerCase()?.includes('freighter') ||
-          err?.message?.toLowerCase()?.includes('extension')
+        err?.message?.toLowerCase()?.includes('freighter')
           ? 'Instalá Freighter Wallet para continuar'
-          : 'Error al conectar la wallet'
+          : 'Error al conectar Freighter'
       );
     } finally {
       setIsLoading(false);
       setIsOpen(false);
     }
-  }, [network]);
+  }, []);
+
+  const airdrop = async () => {
+    if (!address) return;
+    setIsBalanceLoading(true);
+    try {
+      const res = await fetch('/api/wallet/airdrop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicKey: address }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBalance(data.balance ?? null);
+        await fetchBalance(address, 'TESTNET');
+      } else {
+        setError(data.error || 'Airdrop falló');
+      }
+    } catch {
+      setError('Error al solicitar airdrop');
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
 
   const disconnect = () => {
     setAddress(null);
     setBalance(null);
+    setShowSuccess(false);
     localStorage.removeItem(STORAGE_KEYS.ADDRESS);
     localStorage.removeItem(STORAGE_KEYS.CONNECTED);
+    localStorage.removeItem(STORAGE_KEYS.MODE);
+    sessionStorage.removeItem('gamingos_temp_secret');
     setIsOpen(false);
   };
 
@@ -176,32 +247,44 @@ export default function WalletConnect() {
   if (!address) {
     return (
       <div className="relative">
-        <button
-          onClick={connect}
-          disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium transition disabled:opacity-60"
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Wallet className="w-4 h-4" />
-          )}
-          {isLoading ? 'Conectando...' : 'Conectar Wallet'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={connectManaged}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium transition disabled:opacity-60"
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            {isLoading ? 'Creando wallet...' : 'Conectar Stellar'}
+          </button>
+        </div>
+
+        {/* Success toast */}
+        {showSuccess && (
+          <div className="absolute top-full right-0 mt-3 w-72 p-4 rounded-xl bg-slate-900 border border-emerald-500/30 shadow-xl z-50">
+            <div className="space-y-2">
+              {successSteps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm text-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{step.replace(/^✅\s*/, '').replace(/^⚠️\s*/, '')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="absolute top-full right-0 mt-2 w-72 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs z-50">
             {error}
-            <div className="mt-2 space-y-1">
-              <a
-                href="https://www.freighter.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block underline hover:text-red-300"
-              >
-                Descargar Freighter →
-              </a>
-            </div>
+            <button
+              onClick={connectFreighter}
+              className="block mt-2 underline hover:text-red-300"
+            >
+              Usar Freighter en su lugar →
+            </button>
           </div>
         )}
       </div>
@@ -211,6 +294,19 @@ export default function WalletConnect() {
   // Connected
   return (
     <div className="relative">
+      {showSuccess && (
+        <div className="absolute top-full right-0 mt-3 w-72 p-4 rounded-xl bg-slate-900 border border-emerald-500/30 shadow-xl z-50">
+          <div className="space-y-2">
+            {successSteps.map((step, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{step.replace(/^✅\s*/, '').replace(/^⚠️\s*/, '')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm transition"
@@ -243,14 +339,13 @@ export default function WalletConnect() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 top-full mt-2 w-80 rounded-xl bg-slate-900 border border-slate-700 shadow-xl z-50 overflow-hidden">
-            {/* Header with balance */}
-            <div className="p-4 border-b border-slate-800 bg-slate-900/80">
+            {/* Balance */}
+            <div className="p-4 border-b border-slate-800">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-xs text-slate-500">Balance</div>
                 <button
                   onClick={() => address && fetchBalance(address, network)}
                   className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
-                  title="Actualizar balance"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${isBalanceLoading ? 'animate-spin' : ''}`}
@@ -269,9 +364,21 @@ export default function WalletConnect() {
                   <span className="text-slate-500 text-lg">—</span>
                 )}
               </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {NETWORKS[network].name}
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                <span>{NETWORKS[network].name}</span>
+                <span>·</span>
+                <span className="capitalize">{mode === 'managed' ? 'GamingOS Wallet' : 'Freighter'}</span>
               </div>
+
+              {mode === 'managed' && network === 'TESTNET' && (
+                <button
+                  onClick={airdrop}
+                  disabled={isBalanceLoading}
+                  className="mt-3 w-full py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-medium transition"
+                >
+                  Solicitar XLM (Friendbot)
+                </button>
+              )}
             </div>
 
             {/* Address */}
@@ -284,7 +391,6 @@ export default function WalletConnect() {
                 <button
                   onClick={copyAddress}
                   className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition shrink-0"
-                  title="Copiar"
                 >
                   {copied ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -303,7 +409,7 @@ export default function WalletConnect() {
               </a>
             </div>
 
-            {/* Network Switch */}
+            {/* Network */}
             <div className="p-3 border-b border-slate-800">
               <div className="text-xs text-slate-500 mb-2 px-1">Red</div>
               <div className="grid grid-cols-2 gap-2">
@@ -319,7 +425,8 @@ export default function WalletConnect() {
                 </button>
                 <button
                   onClick={() => switchNetwork('PUBLIC')}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${\                    network === 'PUBLIC'
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    network === 'PUBLIC'
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                       : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-transparent'
                   }`}
@@ -327,12 +434,19 @@ export default function WalletConnect() {
                   Mainnet
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2 px-1">
-                Cambia también la red dentro de Freighter para que coincida.
-              </p>
             </div>
 
-            {/* Disconnect */}
+            {/* Alt connect Freighter */}
+            {mode === 'managed' && (
+              <button
+                onClick={connectFreighter}
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-400 hover:bg-slate-800 transition border-b border-slate-800"
+              >
+                <Wallet className="w-4 h-4" />
+                Usar Freighter
+              </button>
+            )}
+
             <button
               onClick={disconnect}
               className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition"

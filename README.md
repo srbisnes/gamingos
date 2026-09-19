@@ -2,61 +2,59 @@
 
 **AI-powered Operational Intelligence Platform for iGaming Operators**
 
-GamingOS is a pure SaaS platform that helps iGaming operators manage risk, treasury, compliance, support and analytics from a single AI-driven interface.
+## Stellar Wallet (Testnet auto-register)
 
-We **never** custody player funds. The money always stays with the operator.
+Al pulsar **Conectar Stellar**:
 
-## Features
+1. Se genera un Keypair Stellar Testnet (si no existe sesión)
+2. Se encripta el Secret Key (AES-256-GCM)
+3. Se fondea automáticamente con Friendbot
+4. Se conecta a Horizon Testnet
+5. El usuario ve:
 
-- Connect Stellar wallet (Freighter)
-- Switch between **Testnet** and **Mainnet**
-- Persistent session (localStorage)
-- View address on Stellar Expert
+```
+✅ Wallet Stellar creada
+✅ Cuenta fondeada en Testnet
+✅ Lista para operar
+```
 
-## Positioning
+También soporta **Freighter** como wallet externa.
 
-> GamingOS is an operational software company for iGaming, powered by AI.  
-> Stellar (or any settlement layer) is infrastructure — not the product we sell.
+### API
 
-## Core Modules
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/api/wallet/create` | Crea + fondea wallet Testnet |
+| `GET`  | `/api/wallet/balance?publicKey=G...&network=testnet` | Balance XLM |
+| `POST` | `/api/wallet/airdrop` | Re-fondea vía Friendbot |
 
-- AI Operations Center
-- AI Support Copilot
-- AI Risk Engine
-- AI Treasury Engine
-- Compliance Center
-- Analytics Intelligence + Benchmarks
-- Operator Memory
-- Reporting Engine
-- API Platform
-- Stellar Settlement Layer (infrastructure)
+### Seguridad
 
-## Wallet Connection
+- Secrets encriptados con `WALLET_ENCRYPTION_KEY` (env)
+- El secret solo se devuelve **una vez** al crear
+- Store actual: in-memory (demo). Producción → Postgres:
 
-Uses **Freighter** (`@stellar/freighter-api`).
+```sql
+CREATE TABLE wallets (
+  id TEXT PRIMARY KEY,
+  public_key TEXT UNIQUE NOT NULL,
+  encrypted_secret TEXT NOT NULL,
+  network TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
-1. Install [Freighter](https://www.freighter.app/)
-2. Create or import a Stellar account
-3. Switch Freighter to Testnet or Mainnet
-4. Click **Conectar Wallet** on the site
+### Variables de entorno
 
-The selected network is stored and shown in the UI. Make sure Freighter is on the same network.
+```env
+WALLET_ENCRYPTION_KEY=tu-clave-larga-y-secreta
+```
 
-## Tech Stack
-
-- Next.js 14 (App Router)
-- Tailwind CSS
-- TypeScript
-- `@stellar/freighter-api`
-- `@stellar/stellar-sdk`
-
-## Local development
+### Local
 
 ```bash
 npm install
 npm run dev
 ```
 
----
-
-Built for operators who want intelligence, not another payment processor.
+Live: https://gamingos-1quf.vercel.app
