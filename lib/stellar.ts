@@ -7,6 +7,7 @@ export const NETWORKS = {
     horizon: 'https://horizon-testnet.stellar.org',
     soroban: 'https://soroban-testnet.stellar.org',
     explorer: 'https://stellar.expert/explorer/testnet',
+    friendbot: 'https://friendbot.stellar.org',
   },
   PUBLIC: {
     name: 'Mainnet',
@@ -14,12 +15,22 @@ export const NETWORKS = {
     horizon: 'https://horizon.stellar.org',
     soroban: 'https://mainnet.sorobanrpc.com',
     explorer: 'https://stellar.expert/explorer/public',
+    friendbot: null,
   },
 } as const;
 
 export function truncateAddress(address: string, chars = 4): string {
   if (!address) return '';
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
+}
+
+export function formatXlm(balance: string | number, decimals = 4): string {
+  const num = typeof balance === 'string' ? parseFloat(balance) : balance;
+  if (isNaN(num)) return '0';
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  });
 }
 
 export const STORAGE_KEYS = {
